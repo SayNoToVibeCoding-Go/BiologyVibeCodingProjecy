@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Enzyme Reaction Simulation</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -22,21 +22,27 @@
             --color-slate: #64748b;
         }
 
+        * {
+            box-sizing: border-box;
+            touch-action: manipulation;
+        }
+
         body {
             margin: 0;
             padding: 0;
             background-color: var(--bg-dark);
             color: #f1f5f9;
             font-family: 'Plus Jakarta Sans', sans-serif;
-            overflow: auto;
+            overflow-x: hidden;
             user-select: none;
+            -webkit-user-select: none;
         }
 
         .font-mono {
             font-family: 'JetBrains Mono', monospace;
         }
 
-        /* Glassmorphism Panels */
+        /* Glassmorphism Styling */
         .glass-panel {
             background: var(--panel-bg);
             backdrop-filter: blur(16px);
@@ -62,82 +68,39 @@
             box-shadow: 0 0 15px rgba(0, 242, 254, 0.15);
         }
 
-        /* Main Grid Layout */
-        #app-grid {
-            display: grid;
-            grid-template-columns: 320px 1fr 340px;
-            grid-template-rows: 64px 1fr 140px;
-            height: 100vh;
-            width: 100vw;
-        }
-        @media screen and (max-width: 768px) {
-          #app-grid {
-            width: 100%;
-            font-size: 16px;
-          }
-        }
-
-/* For mobile phones (screens 480px wide or smaller) */
-        @media screen and (max-width: 480px) {
-         #app-grid {
-           width: 100%;
-           padding: 10px;
-           font-size: 14px;
-         }
-        }
-
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar {
-            width: 4px;
-        }
-        ::-webkit-scrollbar-track {
-            background: rgba(15, 23, 42, 0.6);
-        }
-        ::-webkit-scrollbar-thumb {
-            background: rgba(0, 242, 254, 0.3);
-            border-radius: 2px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(0, 242, 254, 0.6);
-        }
-
-        /* Custom Range Sliders */
+        /* Custom Touch-Friendly Sliders */
         input[type=range] {
             -webkit-appearance: none;
             width: 100%;
             background: transparent;
+            min-height: 36px;
         }
         input[type=range]:focus {
             outline: none;
         }
         input[type=range]::-webkit-slider-runnable-track {
             width: 100%;
-            height: 6px;
+            height: 8px;
             cursor: pointer;
             background: rgba(255, 255, 255, 0.15);
-            border-radius: 3px;
+            border-radius: 4px;
         }
         input[type=range]::-webkit-slider-thumb {
-            height: 18px;
-            width: 18px;
+            height: 22px;
+            width: 22px;
             border-radius: 50%;
             background: #ffffff;
             cursor: pointer;
             -webkit-appearance: none;
-            margin-top: -6px;
+            margin-top: -7px;
             box-shadow: 0 0 10px rgba(0, 242, 254, 0.8);
             transition: transform 0.1s;
         }
-        input[type=range]::-webkit-slider-thumb:hover {
-            transform: scale(1.2);
-        }
 
-        /* Specific Slider Glows */
         .slider-ph::-webkit-slider-thumb { background: var(--color-cyan); box-shadow: 0 0 12px var(--color-cyan); }
         .slider-temp::-webkit-slider-thumb { background: var(--color-rose); box-shadow: 0 0 12px var(--color-rose); }
         .slider-time::-webkit-slider-thumb { background: var(--color-amber); box-shadow: 0 0 12px var(--color-amber); }
 
-        /* Color Gradients for Spectrum Bars */
         .ph-gradient {
             background: linear-gradient(to right, #ef4444, #f59e0b, #10b981, #00f2fe, #a855f7);
         }
@@ -145,7 +108,17 @@
             background: linear-gradient(to right, #3b82f6, #10b981, #f59e0b, #ef4444);
         }
 
-        /* Pulsing Glow Animation */
+        /* Ensure 44px min tap targets for mobile usability */
+        .touch-target {
+            min-height: 44px;
+            min-width: 44px;
+        }
+
+        /* Prevent Canvas Touch Scroll Interference */
+        canvas#sim-canvas {
+            touch-action: none;
+        }
+
         @keyframes pulseGlow {
             0%, 100% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.6; transform: scale(0.98); }
@@ -155,170 +128,239 @@
         }
     </style>
 </head>
-<body>
+<body class="flex flex-col h-screen w-screen overflow-hidden">
 
-    <div id="app-grid">
-        
-        <!-- Header -->
-        <header class="glass-panel col-span-3 flex items-center justify-between px-6 z-20 border-b border-cyan-500/20">
-            <div class="flex items-center space-x-3">
-                <div class="p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
-                    </svg>
-                </div>
-                <div>
-                    <h1 class="text-lg font-bold tracking-wider text-white uppercase flex items-center gap-2">
-                        Enzyme Reaction Simulation
-                        <span class="text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono border border-cyan-500/30">v2.5 Lab Edition</span>
-                    </h1>
-                    <p class="text-xs text-slate-400">Interactive Kinetic & Inhibition Engine</p>
-                </div>
+    <!-- Application Header -->
+    <header class="glass-panel w-full h-14 md:h-16 px-4 md:px-6 flex items-center justify-between z-30 shrink-0 border-b border-cyan-500/20">
+        <div class="flex items-center space-x-2 md:space-x-3">
+            <div class="p-1.5 md:p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
+                <svg class="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
+                </svg>
             </div>
-
-            <!-- Status Metrics -->
-            <div class="flex items-center space-x-6 text-xs">
-                <div class="flex items-center space-x-2 bg-slate-900/60 px-3 py-1.5 rounded-lg border border-slate-800">
-                    <span class="text-slate-400">Enzyme State:</span>
-                    <span id="header-status-state" class="font-bold text-emerald-400 flex items-center gap-1">
-                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> OPTIMAL
-                    </span>
-                </div>
-                <div class="flex items-center space-x-2 bg-slate-900/60 px-3 py-1.5 rounded-lg border border-slate-800">
-                    <span class="text-slate-400">Efficiency Rate:</span>
-                    <span id="header-status-rate" class="font-mono font-bold text-cyan-400">100%</span>
-                </div>
-                <div class="flex items-center space-x-2 bg-slate-900/60 px-3 py-1.5 rounded-lg border border-slate-800">
-                    <span class="text-slate-400">FPS:</span>
-                    <span id="header-status-fps" class="font-mono text-slate-300">60</span>
-                </div>
-            </div>
-        </header>
-
-        <!-- Left Panel: Analytics & Substrate Injection -->
-        <aside class="glass-panel p-5 flex flex-col justify-between border-r border-slate-800/80 z-10 overflow-y-auto">
             <div>
-                <h2 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4 pb-2 border-b border-slate-800 flex items-center justify-between">
-                    <span>Live Analytics</span>
+                <h1 class="text-sm md:text-lg font-bold tracking-wider text-white uppercase flex items-center gap-2">
+                    Enzyme Simulation
+                    <span class="hidden sm:inline-block text-[10px] md:text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono border border-cyan-500/30">v3.0 Multi-Device</span>
+                </h1>
+                <p class="hidden md:block text-xs text-slate-400">Interactive Kinetic & Inhibition Engine</p>
+            </div>
+        </div>
+
+        <!-- Metrics Badge -->
+        <div class="flex items-center space-x-2 md:space-x-4 text-xs">
+            <div class="flex items-center space-x-1.5 md:space-x-2 bg-slate-900/80 px-2.5 py-1 md:px-3 md:py-1.5 rounded-lg border border-slate-800">
+                <span class="hidden sm:inline text-slate-400">State:</span>
+                <span id="header-status-state" class="font-bold text-emerald-400 flex items-center gap-1 text-[11px] md:text-xs">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> OPTIMAL
+                </span>
+            </div>
+            <div class="flex items-center space-x-1.5 md:space-x-2 bg-slate-900/80 px-2.5 py-1 md:px-3 md:py-1.5 rounded-lg border border-slate-800">
+                <span class="hidden sm:inline text-slate-400">Rate (V):</span>
+                <span id="header-status-rate" class="font-mono font-bold text-cyan-400 text-[11px] md:text-xs">100%</span>
+            </div>
+            <div class="hidden lg:flex items-center space-x-2 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-800">
+                <span class="text-slate-400">FPS:</span>
+                <span id="header-status-fps" class="font-mono text-slate-300">60</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Mobile Tab Navigation Bar (Visible only on screens < md) -->
+    <nav class="md:hidden glass-panel w-full flex border-b border-slate-800 text-xs font-semibold z-20 shrink-0">
+        <button id="tab-btn-sim" class="flex-1 py-2.5 text-center text-cyan-400 border-b-2 border-cyan-400 transition bg-slate-800/40">
+            Canvas & Controls
+        </button>
+        <button id="tab-btn-enzymes" class="flex-1 py-2.5 text-center text-slate-400 border-b-2 border-transparent transition">
+            Enzymes & Inhibitors
+        </button>
+        <button id="tab-btn-data" class="flex-1 py-2.5 text-center text-slate-400 border-b-2 border-transparent transition">
+            Data & Metrics
+        </button>
+    </nav>
+
+    <!-- Main Content Grid -->
+    <div class="flex-1 grid grid-cols-1 md:grid-cols-12 gap-0 md:gap-4 p-0 md:p-4 overflow-hidden relative">
+
+        <!-- Left Sidebar: Data & Metrics (Desktop: Col 3, Mobile: Tab 3) -->
+        <aside id="panel-data" class="hidden md:flex md:col-span-3 glass-panel p-4 flex-col justify-between border-r md:border border-slate-800 overflow-y-auto z-10 rounded-none md:rounded-2xl">
+            <div>
+                <h2 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3 pb-2 border-b border-slate-800 flex items-center justify-between">
+                    <span>Live Reaction Metrics</span>
                     <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z"></path></svg>
                 </h2>
 
                 <!-- Live Particle Counters -->
-                <div class="grid grid-cols-2 gap-2.5 mb-5">
-                    <div class="p-2.5 rounded-lg bg-emerald-950/20 border border-emerald-500/20">
+                <div class="grid grid-cols-2 gap-2 mb-4">
+                    <div class="p-2.5 rounded-xl bg-emerald-950/20 border border-emerald-500/20">
                         <div class="text-[10px] text-emerald-400 uppercase font-semibold">Substrate (S)</div>
                         <div id="cnt-substrate" class="text-xl font-bold font-mono text-emerald-300">0</div>
                     </div>
-                    <div class="p-2.5 rounded-lg bg-amber-950/20 border border-amber-500/20">
-                        <div class="text-[10px] text-amber-400 uppercase font-semibold">Product (P)</div>
+                    <div class="p-2.5 rounded-xl bg-amber-950/20 border border-amber-500/20">
+                        <div class="text-[10px] text-amber-400 uppercase font-semibold">Product (e.g., Glucose)</div>
                         <div id="cnt-product" class="text-xl font-bold font-mono text-amber-300">0</div>
                     </div>
-                    <div class="p-2.5 rounded-lg bg-blue-950/20 border border-blue-500/20">
+                    <div class="p-2.5 rounded-xl bg-blue-950/20 border border-blue-500/20">
                         <div class="text-[10px] text-blue-400 uppercase font-semibold">ES Complex</div>
                         <div id="cnt-complex" class="text-xl font-bold font-mono text-blue-300">0</div>
                     </div>
-                    <div class="p-2.5 rounded-lg bg-cyan-950/20 border border-cyan-500/20">
+                    <div class="p-2.5 rounded-xl bg-cyan-950/20 border border-cyan-500/20">
                         <div class="text-[10px] text-cyan-400 uppercase font-semibold">Active Enzymes</div>
                         <div id="cnt-active-e" class="text-xl font-bold font-mono text-cyan-300">0</div>
                     </div>
-                    <div class="p-2.5 rounded-lg bg-purple-950/20 border border-purple-500/20">
-                        <div class="text-[10px] text-purple-400 uppercase font-semibold">Inhibitors</div>
+                    <div class="p-2.5 rounded-xl bg-purple-950/20 border border-purple-500/20">
+                        <div class="text-[10px] text-purple-400 uppercase font-semibold">Inhibitors (I)</div>
                         <div id="cnt-inhibitor" class="text-xl font-bold font-mono text-purple-300">0</div>
                     </div>
-                    <div class="p-2.5 rounded-lg bg-rose-950/20 border border-rose-500/20">
+                    <div class="p-2.5 rounded-xl bg-rose-950/20 border border-rose-500/20">
                         <div class="text-[10px] text-rose-400 uppercase font-semibold">Denatured / Poisoned</div>
                         <div id="cnt-disabled" class="text-xl font-bold font-mono text-rose-300">0</div>
                     </div>
                 </div>
 
-                <!-- Product Formation Chart -->
-                <div class="mb-5">
+                <!-- Product Rate Chart -->
+                <div class="mb-4">
                     <div class="flex justify-between items-center mb-1.5">
-                        <span class="text-xs text-slate-300 font-semibold">Reaction Progress Curve</span>
-                        <span class="text-[10px] text-slate-500 font-mono">[Product vs Time]</span>
+                        <span class="text-xs text-slate-300 font-semibold">Product Formation Curve</span>
+                        <span class="text-[10px] text-slate-500 font-mono">[Glucose vs Time]</span>
                     </div>
-                    <div class="h-28 w-full bg-slate-900/80 rounded-lg border border-slate-800 p-1 relative overflow-hidden">
+                    <div class="h-28 w-full bg-slate-900/90 rounded-xl border border-slate-800 p-1 relative overflow-hidden">
                         <canvas id="chart-canvas" class="w-full h-full"></canvas>
                     </div>
                 </div>
             </div>
 
-            <!-- Substrate Controls -->
+            <!-- Substrate Injector Controls -->
             <div class="space-y-2 pt-3 border-t border-slate-800">
-                <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider block mb-2">Substrate Controls</span>
-                <div class="grid grid-cols-2 gap-2">
-                    <button id="btn-add-10" class="py-2 px-3 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-semibold transition">
-                        +10 Substrates
+                <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider block mb-1">Substrate Injector</span>
+                <div class="grid grid-cols-3 gap-2">
+                    <button id="btn-add-25" class="touch-target py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-semibold transition active:scale-95">
+                        +25
                     </button>
-                    <button id="btn-add-50" class="py-2 px-3 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-200 text-xs font-bold transition">
-                        +50 Substrates
+                    <button id="btn-add-50" class="touch-target py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-200 text-xs font-bold transition active:scale-95">
+                        +50
+                    </button>
+                    <button id="btn-add-100" class="touch-target py-2 rounded-xl bg-emerald-500/30 hover:bg-emerald-500/40 border border-emerald-500/50 text-white text-xs font-bold transition active:scale-95">
+                        +100
                     </button>
                 </div>
-                <div class="grid grid-cols-2 gap-2">
-                    <button id="btn-clear-products" class="py-2 px-3 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-semibold transition">
+                <div class="grid grid-cols-2 gap-2 pt-1">
+                    <button id="btn-clear-products" class="touch-target py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-semibold transition active:scale-95">
                         Clear Products
                     </button>
-                    <button id="btn-reset-sim" class="py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-xs font-semibold transition">
+                    <button id="btn-reset-sim" class="touch-target py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-xs font-semibold transition active:scale-95">
                         Reset All
                     </button>
                 </div>
             </div>
         </aside>
 
-        <!-- Center: Reaction Canvas -->
-        <main id="canvas-container" class="relative overflow-hidden bg-radial from-slate-900 via-slate-950 to-black">
-            <canvas id="sim-canvas" class="w-full h-full block"></canvas>
+        <!-- Center Panel: Interactive Simulation Canvas (Desktop: Col 6, Mobile: Main view) -->
+        <main id="panel-sim" class="col-span-1 md:col-span-6 flex flex-col h-full relative overflow-hidden md:rounded-2xl border-0 md:border border-slate-800/80 glass-panel">
+            <!-- Canvas Container -->
+            <div id="canvas-container" class="relative flex-1 w-full h-full min-h-[280px] bg-radial from-slate-900 via-slate-950 to-black overflow-hidden cursor-crosshair">
+                <canvas id="sim-canvas" class="absolute inset-0 w-full h-full block"></canvas>
 
-            <!-- Floating Simulation Visual Legend -->
-            <div class="absolute top-4 right-4 glass-panel p-3 rounded-xl text-xs space-y-1.5 font-mono text-slate-300 pointer-events-none border border-slate-700/50">
-                <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-[#00f2fe] shadow-[0_0_8px_#00f2fe]"></span> Active Enzyme (E)</div>
-                <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-[#10b981] shadow-[0_0_8px_#10b981]"></span> Substrate (S)</div>
-                <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-[#3b82f6] shadow-[0_0_8px_#3b82f6]"></span> ES Complex</div>
-                <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-[#f59e0b] shadow-[0_0_8px_#f59e0b]"></span> Product (P)</div>
-                <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-[#a855f7] shadow-[0_0_8px_#a855f7]"></span> Inhibitor (I)</div>
-                <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-sm bg-[#ef4444]"></span> Denatured / Poisoned</div>
+                <!-- Floating Touch-to-Spawn Hint Overlay -->
+                <div class="absolute top-3 left-3 pointer-events-none bg-slate-900/60 backdrop-blur-md px-2.5 py-1 rounded-lg border border-slate-700/50 text-[10px] md:text-xs text-cyan-300 font-mono">
+                    💡 Tap/Click screen to inject substrate
+                </div>
+
+                <!-- Floating Legend -->
+                <div class="hidden sm:block absolute top-3 right-3 glass-panel p-2.5 rounded-xl text-[10px] md:text-xs space-y-1 font-mono text-slate-300 pointer-events-none border border-slate-700/50">
+                    <div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-[#00f2fe] shadow-[0_0_8px_#00f2fe]"></span> Active Enzyme</div>
+                    <div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-[#10b981] shadow-[0_0_8px_#10b981]"></span> Substrate</div>
+                    <div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-[#3b82f6] shadow-[0_0_8px_#3b82f6]"></span> ES Complex</div>
+                    <div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-[#f59e0b] shadow-[0_0_8px_#f59e0b]"></span> Product</div>
+                    <div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-[#a855f7] shadow-[0_0_8px_#a855f7]"></span> Inhibitor</div>
+                    <div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-sm bg-[#ef4444]"></span> Denatured</div>
+                </div>
+
+                <!-- Denaturation Warning Overlay -->
+                <div id="denatured-overlay" class="absolute inset-0 bg-rose-950/40 backdrop-blur-[2px] flex items-center justify-center pointer-events-none opacity-0 transition-opacity duration-300 z-20">
+                    <div class="glass-panel p-4 md:p-6 rounded-2xl border-rose-500/50 text-center pulse-alert max-w-xs mx-4">
+                        <div class="text-rose-400 font-bold text-base md:text-lg uppercase mb-1">Enzyme Denatured!</div>
+                        <p class="text-xs text-rose-200/90">Extreme pH or Temperature has disrupted hydrogen bonds. Active site conformation permanently lost.</p>
+                    </div>
+                </div>
             </div>
 
-            <!-- Denaturation Overlay Alert -->
-            <div id="denatured-overlay" class="absolute inset-0 bg-rose-950/30 backdrop-blur-[2px] flex items-center justify-center pointer-events-none opacity-0 transition-opacity duration-300">
-                <div class="glass-panel p-6 rounded-2xl border-rose-500/50 text-center pulse-alert max-w-sm">
-                    <div class="text-rose-500 font-bold text-xl uppercase mb-1">Enzyme Denatured!</div>
-                    <p class="text-xs text-rose-200/80">Extreme pH or Temperature has altered the tertiary protein structure. Catalytic active site destroyed.</p>
+            <!-- Bottom Dock Controls (Embedded inside center column for tight layout) -->
+            <div id="mobile-controls-dock" class="glass-panel p-3 md:p-4 border-t border-slate-800 space-y-3 z-20 shrink-0">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <!-- pH Slider -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs font-semibold text-slate-300">pH Level</label>
+                            <div class="flex items-center gap-1.5">
+                                <span id="lbl-ph-val" class="font-mono text-xs font-bold text-cyan-400">7.0</span>
+                                <span id="tag-ph-opt" class="text-[10px] px-1.5 py-0.2 bg-cyan-500/20 text-cyan-300 rounded font-mono">Opt: 7.0</span>
+                            </div>
+                        </div>
+                        <input type="range" id="sl-ph" class="slider-ph" min="0" max="14" step="0.1" value="7.0">
+                        <div class="h-1.5 w-full rounded-full ph-gradient mt-1 opacity-80"></div>
+                    </div>
+
+                    <!-- Temperature Slider -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs font-semibold text-slate-300">Temperature (°C)</label>
+                            <div class="flex items-center gap-1.5">
+                                <span id="lbl-temp-val" class="font-mono text-xs font-bold text-rose-400">37°C</span>
+                                <span id="tag-temp-opt" class="text-[10px] px-1.5 py-0.2 bg-rose-500/20 text-rose-300 rounded font-mono">Opt: 37°C</span>
+                            </div>
+                        </div>
+                        <input type="range" id="sl-temp" class="slider-temp" min="0" max="100" step="1" value="37">
+                        <div class="h-1.5 w-full rounded-full temp-gradient mt-1 opacity-80"></div>
+                    </div>
+
+                    <!-- Speed & Pause Buttons -->
+                    <div class="sm:col-span-2 lg:col-span-1 flex items-center justify-between sm:justify-end space-x-2 pt-1 sm:pt-0">
+                        <div class="flex items-center space-x-1">
+                            <button class="btn-speed touch-target px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-mono text-slate-300 border border-slate-700" data-speed="0.5">0.5x</button>
+                            <button class="btn-speed active touch-target px-2.5 py-1.5 rounded-lg bg-cyan-500/20 border border-cyan-500/50 text-xs font-mono text-cyan-300 font-bold" data-speed="1.0">1.0x</button>
+                            <button class="btn-speed touch-target px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-mono text-slate-300 border border-slate-700" data-speed="2.0">2.0x</button>
+                            <button class="btn-speed touch-target px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-mono text-slate-300 border border-slate-700" data-speed="4.0">4.0x</button>
+                        </div>
+                        <button id="btn-pause" class="touch-target px-4 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 font-bold text-xs transition active:scale-95">
+                            PAUSE
+                        </button>
+                    </div>
                 </div>
             </div>
         </main>
 
-        <!-- Right Panel: Enzyme & Inhibitor Selector -->
-        <aside class="glass-panel p-5 flex flex-col justify-between border-l border-slate-800/80 z-10 overflow-y-auto">
-            <div class="space-y-5">
+        <!-- Right Sidebar: Enzyme & Inhibitor Selectors (Desktop: Col 3, Mobile: Tab 2) -->
+        <aside id="panel-enzymes" class="hidden md:flex md:col-span-3 glass-panel p-4 flex-col justify-between border-l md:border border-slate-800 overflow-y-auto z-10 rounded-none md:rounded-2xl space-y-4">
+            <div>
                 <!-- Enzyme List -->
-                <div>
-                    <h2 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3 pb-2 border-b border-slate-800 flex items-center justify-between">
+                <div class="mb-5">
+                    <h2 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2.5 pb-2 border-b border-slate-800 flex items-center justify-between">
                         <span>Select Enzyme</span>
-                        <span id="lbl-current-enzyme" class="text-cyan-400 font-mono text-[11px]">Pepsin</span>
+                        <span id="lbl-current-enzyme" class="text-cyan-400 font-mono text-[11px]">Salivary Amylase</span>
                     </h2>
                     
-                    <div class="space-y-2 max-h-[260px] overflow-y-auto pr-1" id="enzyme-list-container">
-                        <!-- Enzyme Cards injected dynamically via JS -->
+                    <div class="space-y-2 max-h-[220px] md:max-h-[260px] overflow-y-auto pr-1" id="enzyme-list-container">
+                        <!-- Enzyme cards injected via JS -->
                     </div>
                 </div>
 
-                <!-- Inhibitors -->
+                <!-- Inhibitor Modes -->
                 <div>
-                    <h2 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3 pb-2 border-b border-slate-800">
+                    <h2 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2.5 pb-2 border-b border-slate-800">
                         Inhibitor Mode
                     </h2>
                     
-                    <div class="space-y-1.5" id="inhibitor-list-container">
-                        <!-- Inhibitor modes injected dynamically via JS -->
+                    <div class="space-y-1.5 max-h-[180px] overflow-y-auto pr-1" id="inhibitor-list-container">
+                        <!-- Inhibitor modes injected via JS -->
                     </div>
 
-                    <!-- Inhibitor Actions -->
+                    <!-- Inhibitor Action Buttons -->
                     <div class="grid grid-cols-2 gap-2 mt-3">
-                        <button id="btn-add-inhibitor" class="py-1.5 px-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 text-xs font-semibold transition">
+                        <button id="btn-add-inhibitor" class="touch-target py-2 px-2 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 text-xs font-semibold transition active:scale-95">
                             +10 Inhibitors
                         </button>
-                        <button id="btn-clear-inhibitor" class="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 text-xs font-semibold transition">
+                        <button id="btn-clear-inhibitor" class="touch-target py-2 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 text-xs font-semibold transition active:scale-95">
                             Clear Inhibitors
                         </button>
                     </div>
@@ -326,119 +368,66 @@
             </div>
         </aside>
 
-        <!-- Bottom Control Bar -->
-        <footer class="glass-panel col-span-3 px-8 py-3 flex items-center justify-between border-t border-cyan-500/20 z-20">
-            
-            <!-- pH Controls -->
-            <div class="w-64">
-                <div class="flex justify-between items-center mb-1">
-                    <label class="text-xs font-semibold text-slate-300">pH Level</label>
-                    <div class="flex items-center gap-1.5">
-                        <span id="lbl-ph-val" class="font-mono text-xs font-bold text-cyan-400">7.0</span>
-                        <span id="tag-ph-opt" class="text-[10px] px-1.5 py-0.2 bg-cyan-500/20 text-cyan-300 rounded font-mono">Opt: 7.0</span>
-                    </div>
-                </div>
-                <input type="range" id="sl-ph" class="slider-ph" min="1" max="14" step="0.1" value="7.0">
-                <div class="h-1.5 w-full rounded-full ph-gradient mt-1.5 opacity-80"></div>
-            </div>
-
-            <!-- Temperature Controls -->
-            <div class="w-64">
-                <div class="flex justify-between items-center mb-1">
-                    <label class="text-xs font-semibold text-slate-300">Temperature (°C)</label>
-                    <div class="flex items-center gap-1.5">
-                        <span id="lbl-temp-val" class="font-mono text-xs font-bold text-rose-400">37°C</span>
-                        <span id="tag-temp-opt" class="text-[10px] px-1.5 py-0.2 bg-rose-500/20 text-rose-300 rounded font-mono">Opt: 37°C</span>
-                    </div>
-                </div>
-                <input type="range" id="sl-temp" class="slider-temp" min="0" max="100" step="1" value="37">
-                <div class="h-1.5 w-full rounded-full temp-gradient mt-1.5 opacity-80"></div>
-            </div>
-
-            <!-- Binding Duration / Turnover Time -->
-            <div class="w-56">
-                <div class="flex justify-between items-center mb-1">
-                    <label class="text-xs font-semibold text-slate-300">E-S Reaction Time</label>
-                    <span id="lbl-time-val" class="font-mono text-xs font-bold text-amber-400">800 ms</span>
-                </div>
-                <input type="range" id="sl-time" class="slider-time" min="100" max="2000" step="100" value="800">
-                <div class="flex justify-between text-[10px] text-slate-500 font-mono mt-1">
-                    <span>Fast Turnover</span>
-                    <span>Slow Binding</span>
-                </div>
-            </div>
-
-            <!-- Speed Toggles & Pause -->
-            <div class="flex items-center space-x-2">
-                <span class="text-xs text-slate-400 font-semibold mr-1">Sim Speed:</span>
-                <button class="btn-speed px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs font-mono text-slate-300 border border-slate-700" data-speed="0.5">0.5x</button>
-                <button class="btn-speed active px-2.5 py-1 rounded bg-cyan-500/20 border border-cyan-500/50 text-xs font-mono text-cyan-300 font-bold" data-speed="1.0">1.0x</button>
-                <button class="btn-speed px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs font-mono text-slate-300 border border-slate-700" data-speed="2.0">2.0x</button>
-                <button class="btn-speed px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs font-mono text-slate-300 border border-slate-700" data-speed="5.0">5.0x</button>
-                
-                <button id="btn-pause" class="ml-2 p-2 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 font-bold text-xs transition">
-                    PAUSE
-                </button>
-            </div>
-
-        </footer>
     </div>
 
-    <!-- JavaScript Engine -->
+    <!-- JavaScript Application Logic -->
     <script>
-        // Database of 8 distinct real-world enzymes
+        // Database of 7 specialized real-world enzymes
         const ENZYME_DB = [
-            { id: 'pepsin', name: 'Pepsin', optPh: 2.0, optTemp: 37, desc: 'Stomach protein digestion', denatureTemp: 58 },
-            { id: 'amylase', name: 'Salivary Amylase', optPh: 6.8, optTemp: 37, desc: 'Salivary starch breakdown', denatureTemp: 60 },
-            { id: 'trypsin', name: 'Trypsin', optPh: 8.0, optTemp: 37, desc: 'Intestinal protein breakdown', denatureTemp: 62 },
-            { id: 'catalase', name: 'Catalase', optPh: 7.0, optTemp: 37, desc: 'Hydrogen peroxide decomposition', denatureTemp: 60 },
-            { id: 'lactase', name: 'Lactase', optPh: 6.0, optTemp: 37, desc: 'Lactose sugar breakdown', denatureTemp: 58 },
-            { id: 'taq', name: 'Taq Polymerase', optPh: 8.0, optTemp: 75, desc: 'Thermophilic DNA replication', denatureTemp: 92 },
-            { id: 'alp', name: 'Alkaline Phosphatase', optPh: 9.8, optTemp: 37, desc: 'Dephosphorylation in bone/liver', denatureTemp: 65 },
-            { id: 'lipase', name: 'Pancreatic Lipase', optPh: 8.0, optTemp: 37, desc: 'Lipid triglyceride breakdown', denatureTemp: 60 }
+            { id: 'amylase', name: 'Salivary Amylase', optPh: 6.8, optTemp: 37, desc: 'Breaks down starches into maltose & glucose', denatureTemp: 60 },
+            { id: 'pepsin', name: 'Pepsin', optPh: 2.0, optTemp: 37, desc: 'Stomach acid protease hydrolyzing proteins', denatureTemp: 58 },
+            { id: 'trypsin', name: 'Trypsin', optPh: 8.0, optTemp: 37, desc: 'Small intestine peptidase for protein breakdown', denatureTemp: 62 },
+            { id: 'catalase', name: 'Catalase', optPh: 7.0, optTemp: 37, desc: 'Decomposes toxic H₂O₂ into water and oxygen', denatureTemp: 60 },
+            { id: 'lactase', name: 'Lactase', optPh: 6.0, optTemp: 37, desc: 'Hydrolyzes lactose sugar into glucose & galactose', denatureTemp: 58 },
+            { id: 'lipase', name: 'Pancreatic Lipase', optPh: 8.0, optTemp: 37, desc: 'Digests dietary lipids and triglycerides', denatureTemp: 60 },
+            { id: 'taq', name: 'Taq Polymerase', optPh: 8.0, optTemp: 75, desc: 'Thermophilic DNA polymerase used in PCR', denatureTemp: 92 }
         ];
 
-        // Inhibitor modes
+        // Database of 5 inhibitor modes
         const INHIBITOR_DB = [
             { id: 'none', name: 'None (Control)', desc: 'Uninhibited natural enzyme kinetics' },
-            { id: 'cyanide', name: 'Cyanide Poison', desc: 'Irreversible non-competitive active site poison' },
-            { id: 'malonate', name: 'Malonate', desc: 'Competitive inhibitor (competes for active site)' },
-            { id: 'lead', name: 'Heavy Metal (Lead)', desc: 'Allosteric inhibitor (distorts active site)' },
-            { id: 'reversible', name: 'Reversible Mimic', desc: 'Competitive inhibitor with temporary active site binding' }
+            { id: 'cyanide', name: 'Cyanide (Irreversible)', desc: 'Permanently poisons catalytic active site' },
+            { id: 'malonate', name: 'Malonate (Competitive)', desc: 'Competes directly with substrate for active site' },
+            { id: 'lead', name: 'Heavy Metal (Lead/Mercury)', desc: 'Disrupts disulfide bridges & denatures site' },
+            { id: 'allosteric', name: 'Allosteric Inhibitor', desc: 'Binds non-competitive site, altering active site shape' }
         ];
 
-        // State variables
+        // Global State
         let state = {
             currentEnzyme: ENZYME_DB[0],
             currentInhibitor: INHIBITOR_DB[0],
-            ph: 2.0,
+            ph: 6.8,
             temp: 37,
-            baseBindingTimeMs: 800,
+            baseBindingTimeMs: 600,
             simSpeed: 1.0,
             isPaused: false,
             efficiencyRate: 1.0,
             isDenatured: false,
             
-            // Particle Arrays
+            // Particle Lists
             enzymes: [],
             substrates: [],
             products: [],
             inhibitors: [],
 
-            // Analytics History
+            // Chart metrics
             productHistory: new Array(60).fill(0),
             fps: 60,
-            lastFrameTime: performance.now()
+            lastFrameTime: performance.now(),
+            
+            // Scaled logic dimensions
+            simWidth: 800,
+            simHeight: 600
         };
 
-        // DOM elements cache
+        // Cache DOM UI Elements
         const UI = {
             canvas: document.getElementById('sim-canvas'),
             ctx: document.getElementById('sim-canvas').getContext('2d'),
             chartCanvas: document.getElementById('chart-canvas'),
             chartCtx: document.getElementById('chart-canvas').getContext('2d'),
             
-            // Text Labels
+            // Labels
             lblState: document.getElementById('header-status-state'),
             lblRate: document.getElementById('header-status-rate'),
             lblFps: document.getElementById('header-status-fps'),
@@ -447,7 +436,6 @@
             lblPhOpt: document.getElementById('tag-ph-opt'),
             lblTempVal: document.getElementById('lbl-temp-val'),
             lblTempOpt: document.getElementById('tag-temp-opt'),
-            lblTimeVal: document.getElementById('lbl-time-val'),
             
             // Counters
             cntSubstrate: document.getElementById('cnt-substrate'),
@@ -460,15 +448,23 @@
             // Sliders
             slPh: document.getElementById('sl-ph'),
             slTemp: document.getElementById('sl-temp'),
-            slTime: document.getElementById('sl-time'),
 
-            // Lists
+            // Lists & Panels
             enzymeListContainer: document.getElementById('enzyme-list-container'),
             inhibitorListContainer: document.getElementById('inhibitor-list-container'),
+            panelSim: document.getElementById('panel-sim'),
+            panelEnzymes: document.getElementById('panel-enzymes'),
+            panelData: document.getElementById('panel-data'),
+
+            // Mobile Tabs
+            tabSim: document.getElementById('tab-btn-sim'),
+            tabEnzymes: document.getElementById('tab-btn-enzymes'),
+            tabData: document.getElementById('tab-btn-data'),
             
             // Buttons
-            btnAdd10: document.getElementById('btn-add-10'),
+            btnAdd25: document.getElementById('btn-add-25'),
             btnAdd50: document.getElementById('btn-add-50'),
+            btnAdd100: document.getElementById('btn-add-100'),
             btnClearP: document.getElementById('btn-clear-products'),
             btnResetSim: document.getElementById('btn-reset-sim'),
             btnAddInhibitor: document.getElementById('btn-add-inhibitor'),
@@ -479,8 +475,7 @@
             denaturedOverlay: document.getElementById('denatured-overlay')
         };
 
-        
-        // Base Particle Class
+        // Particle Base Class
         class Particle {
             constructor(x, y, radius) {
                 this.x = x;
@@ -491,22 +486,22 @@
                 this.vy = Math.sin(angle);
             }
 
-            move(canvasWidth, canvasHeight, temp) {
-                // Kinetic speed scales with temperature
-                const speedFactor = Math.max(0.1, Math.sqrt(temp + 5) / 5.5);
+            move(width, height, temp) {
+                // Kinetic motion scales with temperature
+                const speedFactor = Math.max(0.15, Math.sqrt(temp + 10) / 5.5);
                 
                 this.x += this.vx * speedFactor * state.simSpeed;
                 this.y += this.vy * speedFactor * state.simSpeed;
 
-                // Screen bounce
+                // Screen boundary bouncing
                 if (this.x - this.radius < 0) { this.x = this.radius; this.vx *= -1; }
-                if (this.x + this.radius > canvasWidth) { this.x = canvasWidth - this.radius; this.vx *= -1; }
+                if (this.x + this.radius > width) { this.x = width - this.radius; this.vx *= -1; }
                 if (this.y - this.radius < 0) { this.y = this.radius; this.vy *= -1; }
-                if (this.y + this.radius > canvasHeight) { this.y = canvasHeight - this.radius; this.vy *= -1; }
+                if (this.y + this.radius > height) { this.y = height - this.radius; this.vy *= -1; }
             }
         }
 
-        // Substrate Particle (S)
+        // Substrate Class (Green)
         class Substrate extends Particle {
             constructor(x, y) {
                 super(x, y, 6);
@@ -517,16 +512,16 @@
                 ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
                 ctx.fillStyle = '#10b981';
                 ctx.shadowColor = '#10b981';
-                ctx.shadowBlur = 8;
+                ctx.shadowBlur = 6;
                 ctx.fill();
                 ctx.shadowBlur = 0;
             }
         }
 
-        // Product Particle (P)
+        // Product Class (Gold/Amber)
         class Product extends Particle {
             constructor(x, y) {
-                super(x, y, 4);
+                super(x, y, 4.5);
             }
 
             draw(ctx) {
@@ -534,17 +529,17 @@
                 ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
                 ctx.fillStyle = '#f59e0b';
                 ctx.shadowColor = '#f59e0b';
-                ctx.shadowBlur = 10;
+                ctx.shadowBlur = 8;
                 ctx.fill();
                 ctx.shadowBlur = 0;
             }
         }
 
-        // Inhibitor Particle (I)
+        // Inhibitor Class
         class Inhibitor extends Particle {
             constructor(x, y, type) {
                 super(x, y, 6);
-                this.type = type; // 'cyanide', 'malonate', 'lead', 'reversible'
+                this.type = type;
             }
 
             draw(ctx) {
@@ -553,21 +548,19 @@
                 ctx.beginPath();
                 
                 if (this.type === 'cyanide') {
-                    // Skull/poison cross
                     ctx.rect(-5, -5, 10, 10);
                     ctx.fillStyle = '#ef4444';
                     ctx.shadowColor = '#ef4444';
                 } else if (this.type === 'lead') {
-                    // Heavy metal circle
                     ctx.arc(0, 0, 7, 0, Math.PI * 2);
                     ctx.fillStyle = '#64748b';
                     ctx.shadowColor = '#94a3b8';
                 } else {
-                    // Diamond for competitive inhibitors
                     ctx.moveTo(0, -7);
                     ctx.lineTo(7, 0);
-                    ctx.moveTo(0, 7);
+                    ctx.lineTo(0, 7);
                     ctx.lineTo(-7, 0);
+                    ctx.closePath();
                     ctx.fillStyle = '#a855f7';
                     ctx.shadowColor = '#a855f7';
                 }
@@ -579,11 +572,11 @@
             }
         }
 
-        // Enzyme Particle (E)
+        // Enzyme Particle Class
         class Enzyme extends Particle {
             constructor(x, y) {
                 super(x, y, 16);
-                this.state = 'ACTIVE'; // 'ACTIVE', 'ES_COMPLEX', 'EI_COMPLEX', 'DENATURED', 'POISONED'
+                this.state = 'ACTIVE'; // ACTIVE, ES_COMPLEX, EI_COMPLEX, DENATURED, POISONED
                 this.bindingTimer = 0;
                 this.maxBindingTimer = 60;
                 this.rotation = Math.random() * Math.PI * 2;
@@ -598,20 +591,19 @@
                 ctx.beginPath();
 
                 if (this.state === 'DENATURED') {
-                    // Crinkled, deformed enzyme shape
-                    ctx.moveTo(-14, -10);
-                    ctx.lineTo(0, -18);
-                    ctx.lineTo(16, -8);
-                    ctx.lineTo(12, 14);
-                    ctx.lineTo(-10, 16);
+                    // Deformed denatured polygon
+                    ctx.moveTo(-14, -8);
+                    ctx.lineTo(2, -16);
+                    ctx.lineTo(16, -6);
+                    ctx.lineTo(10, 14);
+                    ctx.lineTo(-12, 14);
                     ctx.closePath();
-                    ctx.fillStyle = '#475569';
+                    ctx.fillStyle = '#334155';
                     ctx.fill();
                     ctx.strokeStyle = '#ef4444';
                     ctx.lineWidth = 1.5;
                     ctx.stroke();
                 } else if (this.state === 'POISONED') {
-                    // Poisoned by Cyanide / Lead
                     ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
                     ctx.fillStyle = '#1e1b4b';
                     ctx.fill();
@@ -619,15 +611,15 @@
                     ctx.lineWidth = 2;
                     ctx.stroke();
 
-                    // Draw skull or X mark inside
+                    // X-mark for poisoned active site
                     ctx.beginPath();
                     ctx.moveTo(-6, -6); ctx.lineTo(6, 6);
                     ctx.moveTo(6, -6); ctx.lineTo(-6, 6);
                     ctx.strokeStyle = '#ef4444';
                     ctx.stroke();
                 } else {
-                    // Normal Active or Bound Enzyme with Pacman-like Notch for Active Site
-                    const notchAngle = 0.5; // notch size
+                    // Active site notch
+                    const notchAngle = 0.5;
                     ctx.arc(0, 0, this.radius, notchAngle, Math.PI * 2 - notchAngle);
                     ctx.lineTo(0, 0);
                     ctx.closePath();
@@ -643,10 +635,10 @@
                         ctx.shadowColor = '#00f2fe';
                     }
 
-                    ctx.shadowBlur = 12;
+                    ctx.shadowBlur = 10;
                     ctx.fill();
 
-                    // Draw Substrate bound inside active site notch
+                    // Render bound substrate inside complex
                     if (this.state === 'ES_COMPLEX') {
                         ctx.beginPath();
                         ctx.arc(7, 0, 5, 0, Math.PI * 2);
@@ -654,7 +646,7 @@
                         ctx.fill();
                     }
 
-                    // Draw Inhibitor bound inside active site or allosteric site
+                    // Render bound inhibitor inside complex
                     if (this.state === 'EI_COMPLEX') {
                         ctx.beginPath();
                         ctx.arc(7, 0, 5, 0, Math.PI * 2);
@@ -666,7 +658,7 @@
                 ctx.restore();
                 ctx.shadowBlur = 0;
 
-                // Draw ES Binding Timer Ring
+                // ES Binding Progress Ring
                 if (this.state === 'ES_COMPLEX' && this.maxBindingTimer > 0) {
                     const progress = this.bindingTimer / this.maxBindingTimer;
                     ctx.beginPath();
@@ -678,20 +670,18 @@
             }
         }
 
-
-        // Calculate efficiency based on pH and Temperature curves
+        // Calculate Reaction Kinetics (pH & Temperature optimum bell curves)
         function calculateKinetics() {
             const e = state.currentEnzyme;
 
-            // Permanent Denaturation Check
+            // Denaturation conditions
             if (state.temp > e.denatureTemp || state.ph < (e.optPh - 3.8) || state.ph > (e.optPh + 3.8)) {
                 state.isDenatured = true;
                 state.efficiencyRate = 0;
                 
-                // Set all enzymes to denatured state
                 state.enzymes.forEach(enz => {
                     if (enz.state === 'ES_COMPLEX') {
-                        // Release substrate unreacted
+                        // Release unreacted substrate
                         state.substrates.push(new Substrate(enz.x, enz.y));
                     }
                     enz.state = 'DENATURED';
@@ -699,7 +689,7 @@
 
                 UI.denaturedOverlay.style.opacity = '1';
                 UI.lblState.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span> DENATURED`;
-                UI.lblState.className = "font-bold text-rose-500 flex items-center gap-1";
+                UI.lblState.className = "font-bold text-rose-500 flex items-center gap-1 text-[11px] md:text-xs";
                 UI.lblRate.innerText = "0%";
                 return;
             }
@@ -707,14 +697,14 @@
             state.isDenatured = false;
             UI.denaturedOverlay.style.opacity = '0';
 
-            // Reset denatured enzymes back to active if condition returns to normal
+            // Restore enzymes if returned to viable range
             state.enzymes.forEach(enz => {
                 if (enz.state === 'DENATURED') {
                     enz.state = 'ACTIVE';
                 }
             });
 
-            // Temperature Bell Curve (Arrhenius effect + thermal decay)
+            // Temperature curve
             let tempFactor = 0;
             if (state.temp <= e.optTemp) {
                 tempFactor = Math.exp(-Math.pow(state.temp - e.optTemp, 2) / 350);
@@ -722,36 +712,35 @@
                 tempFactor = Math.exp(-Math.pow(state.temp - e.optTemp, 2) / 120);
             }
 
-            // pH Bell Curve
+            // pH curve
             const phFactor = Math.exp(-Math.pow(state.ph - e.optPh, 2) / 2.0);
 
-            // Total catalytic efficiency
+            // Total Efficiency Rate
             state.efficiencyRate = Math.max(0.01, tempFactor * phFactor);
 
-            // Update Header Status UI
+            // Update UI status header
             const ratePercent = Math.round(state.efficiencyRate * 100);
             UI.lblRate.innerText = `${ratePercent}%`;
 
             if (ratePercent > 70) {
                 UI.lblState.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> OPTIMAL`;
-                UI.lblState.className = "font-bold text-emerald-400 flex items-center gap-1";
+                UI.lblState.className = "font-bold text-emerald-400 flex items-center gap-1 text-[11px] md:text-xs";
             } else if (ratePercent > 20) {
                 UI.lblState.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400"></span> SUB-OPTIMAL`;
-                UI.lblState.className = "font-bold text-amber-400 flex items-center gap-1";
+                UI.lblState.className = "font-bold text-amber-400 flex items-center gap-1 text-[11px] md:text-xs";
             } else {
                 UI.lblState.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-400"></span> LOW ACTIVITY`;
-                UI.lblState.className = "font-bold text-rose-400 flex items-center gap-1";
+                UI.lblState.className = "font-bold text-rose-400 flex items-center gap-1 text-[11px] md:text-xs";
             }
         }
 
-        // Process collisions between particles
+        // Collision and Reaction Physics Logic
         function processCollisions() {
             if (state.isDenatured) return;
 
-            // Convert baseBindingTimeMs into frames at 60fps
             const baseFrames = Math.max(10, Math.round((state.baseBindingTimeMs / 1000) * 60));
 
-            // 1. Check Substrate-Enzyme collisions
+            // 1. Substrate + Active Enzyme Collision
             for (let i = state.substrates.length - 1; i >= 0; i--) {
                 const s = state.substrates[i];
 
@@ -764,17 +753,14 @@
                         const dist = Math.sqrt(dx * dx + dy * dy);
 
                         if (dist < s.radius + e.radius) {
-                            // Probability of successful collision depends on efficiency rate
                             if (Math.random() < state.efficiencyRate) {
                                 e.state = 'ES_COMPLEX';
                                 e.rotation = Math.atan2(dy, dx);
                                 
-                                // Binding time scales inversely with efficiency (higher rate = faster reaction completion)
                                 const duration = Math.round(baseFrames / Math.max(0.2, state.efficiencyRate));
                                 e.bindingTimer = duration;
                                 e.maxBindingTimer = duration;
 
-                                // Remove substrate from canvas
                                 state.substrates.splice(i, 1);
                                 break;
                             }
@@ -783,7 +769,7 @@
                 }
             }
 
-            // 2. Check Inhibitor-Enzyme collisions
+            // 2. Inhibitor + Enzyme Collision
             for (let i = state.inhibitors.length - 1; i >= 0; i--) {
                 const inh = state.inhibitors[i];
 
@@ -796,21 +782,14 @@
                         const dist = Math.sqrt(dx * dx + dy * dy);
 
                         if (dist < inh.radius + e.radius) {
-                            if (inh.type === 'cyanide') {
-                                // Permanent Irreversible Poison
+                            if (inh.type === 'cyanide' || inh.type === 'lead') {
                                 e.state = 'POISONED';
                                 state.inhibitors.splice(i, 1);
                                 break;
-                            } else if (inh.type === 'lead') {
-                                // Allosteric distortion
-                                e.state = 'POISONED';
-                                state.inhibitors.splice(i, 1);
-                                break;
-                            } else if (inh.type === 'malonate' || inh.type === 'reversible') {
-                                // Reversible Competitive Binding
+                            } else if (inh.type === 'malonate' || inh.type === 'allosteric') {
                                 e.state = 'EI_COMPLEX';
                                 e.rotation = Math.atan2(dy, dx);
-                                e.bindingTimer = baseFrames * 2.5; // Holds enzyme occupied for a while
+                                e.bindingTimer = baseFrames * 2.5;
                                 e.maxBindingTimer = e.bindingTimer;
                                 e.inhibitorType = inh.type;
                                 state.inhibitors.splice(i, 1);
@@ -821,21 +800,29 @@
                 }
             }
 
-            // 3. Update Enzyme timers (ES and EI complexes)
+            // 3. Progress ES & EI Complexes
             state.enzymes.forEach(e => {
                 if (e.state === 'ES_COMPLEX') {
                     e.bindingTimer -= state.simSpeed;
                     if (e.bindingTimer <= 0) {
-                        // Reaction finished -> release product!
                         e.state = 'ACTIVE';
-                        const px = e.x + Math.cos(e.rotation) * (e.radius + 6);
-                        const py = e.y + Math.sin(e.rotation) * (e.radius + 6);
-                        state.products.push(new Product(px, py));
+                        // Release 2 Product particles upon substrate cleavage
+                        const angle1 = e.rotation + 0.3;
+                        const angle2 = e.rotation - 0.3;
+                        
+                        const p1 = new Product(e.x + Math.cos(angle1) * (e.radius + 6), e.y + Math.sin(angle1) * (e.radius + 6));
+                        const p2 = new Product(e.x + Math.cos(angle2) * (e.radius + 6), e.y + Math.sin(angle2) * (e.radius + 6));
+                        
+                        p1.vx = Math.cos(angle1) * 1.5;
+                        p1.vy = Math.sin(angle1) * 1.5;
+                        p2.vx = Math.cos(angle2) * 1.5;
+                        p2.vy = Math.sin(angle2) * 1.5;
+
+                        state.products.push(p1, p2);
                     }
                 } else if (e.state === 'EI_COMPLEX') {
                     e.bindingTimer -= state.simSpeed;
                     if (e.bindingTimer <= 0) {
-                        // Reversible inhibitor unbinds & releases back to canvas
                         e.state = 'ACTIVE';
                         const ix = e.x + Math.cos(e.rotation) * (e.radius + 6);
                         const iy = e.y + Math.sin(e.rotation) * (e.radius + 6);
@@ -845,14 +832,12 @@
             });
         }
 
-
-        // Draw Product vs Time Line Graph
+        // Render Product Formation Graph
         function updateChart() {
             const ctx = UI.chartCtx;
             const w = UI.chartCanvas.width;
             const h = UI.chartCanvas.height;
 
-            // Push current product count to history array
             state.productHistory.push(state.products.length);
             if (state.productHistory.length > 60) {
                 state.productHistory.shift();
@@ -860,43 +845,40 @@
 
             ctx.clearRect(0, 0, w, h);
 
-            // Draw background grid lines
+            // Gridlines
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(0, h/2); ctx.lineTo(w, h/2);
-            ctx.moveTo(0, h/4); ctx.lineTo(w, h/4);
-            ctx.moveTo(0, 3*h/4); ctx.lineTo(w, 3*h/4);
             ctx.stroke();
 
-            // Plot curve
-            const maxP = Math.max(50, ...state.productHistory);
+            // Product curve
+            const maxP = Math.max(40, ...state.productHistory);
             ctx.beginPath();
-            ctx.moveTo(0, h - (state.productHistory[0] / maxP) * (h - 10));
+            ctx.moveTo(0, h - (state.productHistory[0] / maxP) * (h - 8));
 
             for (let i = 1; i < state.productHistory.length; i++) {
                 const x = (i / (state.productHistory.length - 1)) * w;
-                const y = h - (state.productHistory[i] / maxP) * (h - 10);
+                const y = h - (state.productHistory[i] / maxP) * (h - 8);
                 ctx.lineTo(x, y);
             }
 
-            // Line stroke
             ctx.strokeStyle = '#f59e0b';
             ctx.lineWidth = 2;
             ctx.stroke();
 
-            // Gradient Fill beneath curve
+            // Gradient Fill
             ctx.lineTo(w, h);
             ctx.lineTo(0, h);
             ctx.closePath();
             const grad = ctx.createLinearGradient(0, 0, 0, h);
-            grad.addColorStop(0, 'rgba(245, 158, 11, 0.3)');
+            grad.addColorStop(0, 'rgba(245, 158, 11, 0.25)');
             grad.addColorStop(1, 'rgba(245, 158, 11, 0.0)');
             ctx.fillStyle = grad;
             ctx.fill();
         }
 
-        // Sync numerical text labels
+        // Sync Numerical Counters
         function updateCountersUI() {
             UI.cntSubstrate.innerText = state.substrates.length;
             UI.cntProduct.innerText = state.products.length;
@@ -919,7 +901,6 @@
 
         // Main Animation Loop
         function animate(now) {
-            // FPS Calculation
             const delta = now - state.lastFrameTime;
             state.lastFrameTime = now;
             if (delta > 0) state.fps = Math.round(1000 / delta);
@@ -929,17 +910,15 @@
                 calculateKinetics();
                 processCollisions();
 
-                // Clear & Render Main Canvas
                 const ctx = UI.ctx;
-                ctx.clearRect(0, 0, UI.canvas.width, UI.canvas.height);
+                ctx.clearRect(0, 0, state.simWidth, state.simHeight);
 
-                // Update & Draw Particles
-                state.enzymes.forEach(p => { p.move(UI.canvas.width, UI.canvas.height, state.temp); p.draw(ctx); });
-                state.substrates.forEach(p => { p.move(UI.canvas.width, UI.canvas.height, state.temp); p.draw(ctx); });
-                state.products.forEach(p => { p.move(UI.canvas.width, UI.canvas.height, state.temp); p.draw(ctx); });
-                state.inhibitors.forEach(p => { p.move(UI.canvas.width, UI.canvas.height, state.temp); p.draw(ctx); });
+                // Move & Draw particles
+                state.enzymes.forEach(p => { p.move(state.simWidth, state.simHeight, state.temp); p.draw(ctx); });
+                state.substrates.forEach(p => { p.move(state.simWidth, state.simHeight, state.temp); p.draw(ctx); });
+                state.products.forEach(p => { p.move(state.simWidth, state.simHeight, state.temp); p.draw(ctx); });
+                state.inhibitors.forEach(p => { p.move(state.simWidth, state.simHeight, state.temp); p.draw(ctx); });
 
-                // Update Chart periodically
                 if (Math.random() < 0.2) {
                     updateChart();
                 }
@@ -950,23 +929,41 @@
             requestAnimationFrame(animate);
         }
 
-
-        function resizeCanvas() {
+        // High-DPI Responsive Canvas Resizer using ResizeObserver
+        function setupCanvasResizer() {
             const container = document.getElementById('canvas-container');
-            UI.canvas.width = container.clientWidth;
-            UI.canvas.height = container.clientHeight;
+            
+            const resize = () => {
+                const rect = container.getBoundingClientRect();
+                const dpr = window.devicePixelRatio || 1;
 
-            UI.chartCanvas.width = UI.chartCanvas.parentElement.clientWidth;
-            UI.chartCanvas.height = UI.chartCanvas.parentElement.clientHeight;
+                UI.canvas.width = rect.width * dpr;
+                UI.canvas.height = rect.height * dpr;
+                
+                UI.ctx.scale(dpr, dpr);
+
+                state.simWidth = rect.width;
+                state.simHeight = rect.height;
+
+                // Chart resizer
+                if (UI.chartCanvas.parentElement) {
+                    UI.chartCanvas.width = UI.chartCanvas.parentElement.clientWidth;
+                    UI.chartCanvas.height = UI.chartCanvas.parentElement.clientHeight;
+                }
+            };
+
+            const observer = new ResizeObserver(() => resize());
+            observer.observe(container);
+            resize();
         }
-        window.addEventListener('resize', resizeCanvas);
 
+        // Populate UI Cards for Enzymes & Inhibitors
         function populateUIControls() {
-            // Render Enzyme Cards
+            // Enzyme Cards
             UI.enzymeListContainer.innerHTML = '';
             ENZYME_DB.forEach(e => {
                 const card = document.createElement('div');
-                card.className = `glass-card p-2.5 rounded-xl cursor-pointer ${e.id === state.currentEnzyme.id ? 'active' : ''}`;
+                card.className = `glass-card p-2.5 rounded-xl cursor-pointer touch-target ${e.id === state.currentEnzyme.id ? 'active' : ''}`;
                 card.innerHTML = `
                     <div class="flex justify-between items-start mb-0.5">
                         <span class="font-bold text-xs text-white">${e.name}</span>
@@ -979,7 +976,6 @@
                     card.classList.add('active');
                     state.currentEnzyme = e;
                     
-                    // Automatically set pH and Temp to optimal values
                     state.ph = e.optPh;
                     state.temp = e.optTemp;
                     UI.slPh.value = e.optPh;
@@ -996,11 +992,11 @@
                 UI.enzymeListContainer.appendChild(card);
             });
 
-            // Render Inhibitor Cards
+            // Inhibitor Cards
             UI.inhibitorListContainer.innerHTML = '';
             INHIBITOR_DB.forEach(inh => {
                 const card = document.createElement('div');
-                card.className = `glass-card p-2 rounded-lg cursor-pointer ${inh.id === state.currentInhibitor.id ? 'active' : ''}`;
+                card.className = `glass-card p-2 rounded-xl cursor-pointer touch-target ${inh.id === state.currentInhibitor.id ? 'active' : ''}`;
                 card.innerHTML = `
                     <div class="font-bold text-xs text-slate-200">${inh.name}</div>
                     <div class="text-[10px] text-slate-400">${inh.desc}</div>
@@ -1014,6 +1010,7 @@
             });
         }
 
+        // Reset All Particles
         function resetSimulation() {
             state.enzymes = [];
             state.substrates = [];
@@ -1021,19 +1018,37 @@
             state.inhibitors = [];
             state.productHistory = new Array(60).fill(0);
 
-            // Populate initial particle set
-            for (let i = 0; i < 18; i++) {
-                state.enzymes.push(new Enzyme(Math.random() * UI.canvas.width, Math.random() * UI.canvas.height));
+            const numEnzymes = window.innerWidth < 768 ? 12 : 18;
+            const numSubstrates = window.innerWidth < 768 ? 35 : 60;
+
+            for (let i = 0; i < numEnzymes; i++) {
+                state.enzymes.push(new Enzyme(Math.random() * state.simWidth, Math.random() * state.simHeight));
             }
-            for (let i = 0; i < 60; i++) {
-                state.substrates.push(new Substrate(Math.random() * UI.canvas.width, Math.random() * UI.canvas.height));
+            for (let i = 0; i < numSubstrates; i++) {
+                state.substrates.push(new Substrate(Math.random() * state.simWidth, Math.random() * state.simHeight));
             }
 
             calculateKinetics();
         }
 
-        // Attach Event Listeners
+        // Event Listeners Setup
         function setupEventListeners() {
+            // Touch/Pointer canvas interaction (Tap to spawn substrates)
+            const handleCanvasTap = (e) => {
+                const rect = UI.canvas.getBoundingClientRect();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                
+                const x = clientX - rect.left;
+                const y = clientY - rect.top;
+
+                for (let i = 0; i < 4; i++) {
+                    state.substrates.push(new Substrate(x + (Math.random() * 20 - 10), y + (Math.random() * 20 - 10)));
+                }
+            };
+
+            UI.canvas.addEventListener('pointerdown', handleCanvasTap);
+
             // Sliders
             UI.slPh.addEventListener('input', (e) => {
                 state.ph = parseFloat(e.target.value);
@@ -1047,43 +1062,39 @@
                 calculateKinetics();
             });
 
-            UI.slTime.addEventListener('input', (e) => {
-                state.baseBindingTimeMs = parseInt(e.target.value);
-                UI.lblTimeVal.innerText = `${state.baseBindingTimeMs} ms`;
-            });
-
-            // Substrate Buttons
-            UI.btnAdd10.addEventListener('click', () => {
-                for (let i = 0; i < 10; i++) {
-                    state.substrates.push(new Substrate(Math.random() * UI.canvas.width, Math.random() * UI.canvas.height));
+            // Substrate Injectors
+            UI.btnAdd25.addEventListener('click', () => {
+                for (let i = 0; i < 25; i++) {
+                    state.substrates.push(new Substrate(Math.random() * state.simWidth, Math.random() * state.simHeight));
                 }
             });
 
             UI.btnAdd50.addEventListener('click', () => {
                 for (let i = 0; i < 50; i++) {
-                    state.substrates.push(new Substrate(Math.random() * UI.canvas.width, Math.random() * UI.canvas.height));
+                    state.substrates.push(new Substrate(Math.random() * state.simWidth, Math.random() * state.simHeight));
                 }
             });
 
-            UI.btnClearP.addEventListener('click', () => {
-                state.products = [];
+            UI.btnAdd100.addEventListener('click', () => {
+                for (let i = 0; i < 100; i++) {
+                    state.substrates.push(new Substrate(Math.random() * state.simWidth, Math.random() * state.simHeight));
+                }
             });
 
+            UI.btnClearP.addEventListener('click', () => { state.products = []; });
             UI.btnResetSim.addEventListener('click', resetSimulation);
 
-            // Inhibitor Buttons
+            // Inhibitor Controls
             UI.btnAddInhibitor.addEventListener('click', () => {
                 if (state.currentInhibitor.id === 'none') return;
                 for (let i = 0; i < 10; i++) {
-                    state.inhibitors.push(new Inhibitor(Math.random() * UI.canvas.width, Math.random() * UI.canvas.height, state.currentInhibitor.id));
+                    state.inhibitors.push(new Inhibitor(Math.random() * state.simWidth, Math.random() * state.simHeight, state.currentInhibitor.id));
                 }
             });
 
-            UI.btnClearInhibitor.addEventListener('click', () => {
-                state.inhibitors = [];
-            });
+            UI.btnClearInhibitor.addEventListener('click', () => { state.inhibitors = []; });
 
-            // Speed Buttons
+            // Speed Toggles
             UI.speedBtns.forEach(btn => {
                 btn.addEventListener('click', () => {
                     UI.speedBtns.forEach(b => {
@@ -1096,7 +1107,7 @@
                 });
             });
 
-            // Pause Button
+            // Pause
             UI.btnPause.addEventListener('click', () => {
                 state.isPaused = !state.isPaused;
                 UI.btnPause.innerText = state.isPaused ? 'RESUME' : 'PAUSE';
@@ -1105,11 +1116,42 @@
                 UI.btnPause.classList.toggle('text-rose-300', !state.isPaused);
                 UI.btnPause.classList.toggle('text-emerald-300', state.isPaused);
             });
+
+            // Mobile Navigation Tabs
+            const switchMobileTab = (activeTab) => {
+                [UI.tabSim, UI.tabEnzymes, UI.tabData].forEach(tab => {
+                    tab.classList.remove('text-cyan-400', 'border-cyan-400', 'bg-slate-800/40');
+                    tab.classList.add('text-slate-400', 'border-transparent');
+                });
+
+                [UI.panelSim, UI.panelEnzymes, UI.panelData].forEach(panel => {
+                    panel.classList.add('hidden');
+                    panel.classList.remove('flex');
+                });
+
+                if (activeTab === 'sim') {
+                    UI.tabSim.classList.add('text-cyan-400', 'border-cyan-400', 'bg-slate-800/40');
+                    UI.panelSim.classList.remove('hidden');
+                    UI.panelSim.classList.add('flex');
+                } else if (activeTab === 'enzymes') {
+                    UI.tabEnzymes.classList.add('text-cyan-400', 'border-cyan-400', 'bg-slate-800/40');
+                    UI.panelEnzymes.classList.remove('hidden');
+                    UI.panelEnzymes.classList.add('flex');
+                } else if (activeTab === 'data') {
+                    UI.tabData.classList.add('text-cyan-400', 'border-cyan-400', 'bg-slate-800/40');
+                    UI.panelData.classList.remove('hidden');
+                    UI.panelData.classList.add('flex');
+                }
+            };
+
+            UI.tabSim.addEventListener('click', () => switchMobileTab('sim'));
+            UI.tabEnzymes.addEventListener('click', () => switchMobileTab('enzymes'));
+            UI.tabData.addEventListener('click', () => switchMobileTab('data'));
         }
 
-        // Initialize Application
+        // Bootstrapping
         window.onload = () => {
-            resizeCanvas();
+            setupCanvasResizer();
             populateUIControls();
             setupEventListeners();
             resetSimulation();
