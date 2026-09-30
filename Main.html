@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enzyme Reaction Simulation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-base: #050505;
+            --panel-bg: rgba(15, 20, 25, 0.85);
+            --border-glow: rgba(0, 255, 204, 0.2);
+            --color-enzyme: #00e5ff;       /* Cyan */
+            --color-substrate: #39ff14;    /* Neon Green */
+            --color-complex: #b026ff;      /* Purple */
+            --color-product: #ffea00;      /* Yellow */
+            --color-denatured: #ff3333;    /* Red */
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-base);
+            color: #e2e8f0;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #app-grid {
+            display: grid;
+            grid-template-columns: 320px 1fr 280px;
+            grid-template-rows: 64px 1fr 140px;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* Panels */
+        .glass-panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-glow);
+            z-index: 10;
+        }
+
+        header {
+            grid-column: 1 / -1;
+            grid-row: 1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            border-bottom: 1px solid var(--border-glow);
+        }
+
+        #left-panel {
+            grid-column: 1;
+            grid-row: 2;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            border-right: 1px solid var(--border-glow);
+        }
+
+        #right-panel {
+            grid-column: 3;
+            grid-row: 2;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            border-left: 1px solid var(--border-glow);
+        }
+
+        #bottom-panel {
+            grid-column: 1 / -1;
+            grid-row: 3;
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            padding: 16px 32px;
+            border-top: 1px solid var(--border-glow);
+        }
+
+        #canvas-container {
+            grid-column: 2;
+            grid-row: 2;
+            position: relative;
+            background: radial-gradient(circle at center, #0a0f18 0%, #000000 100%);
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Sliders */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #fff;
+            cursor: pointer;
+            margin-top: -7px;
+            box-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+        }
+        .slider-ph::-webkit-slider-thumb { background: #00e5ff; box-shadow: 0 0 10px #00e5ff; }
+        .slider-temp::-webkit-slider-thumb { background: #ff3333; box-shadow: 0 0 10px #ff3333; }
+        .slider-speed::-webkit-slider-thumb { background: #b026ff; box-shadow: 0 0 10px #b026ff; }
+
+        /* Buttons */
+        .btn-select {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 12px;
+            border-radius: 8px;
+            text-align: left;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .btn-select:hover { border-color: var(--color-enzyme); }
+        .btn-select.active {
+            background: rgba(0, 229, 255, 0.1);
+            border-color: var(--color-enzyme);
+            box-shadow: 0 0 15px rgba(0, 229, 255, 0.15);
+        }
+
+        /* Progress Bars */
+        .prog-bg { background: #1a202c; height: 10px; border-radius: 5px; overflow: hidden; margin-top: 6px;}
+        .prog-fill { height: 100%; transition: width 0.2s linear; }
+        .fill-s { background: var(--color-substrate); box-shadow: 0 0 8px var(--color-substrate); }
+        .fill-es { background: var(--color-complex); box-shadow: 0 0 8px var(--color-complex); }
+        .fill-p { background: var(--color-product); box-shadow: 0 0 8px var(--color-product); }
+
+        /* Font classes */
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        
+        .pulse-text {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app-grid">
+        
+        <!-- Header -->
+        <header class="glass-panel">
+            <div class="flex items-center gap-4">
+                <div class="w-10 h-10 rounded-full border border-teal-400 flex items-center justify-center bg-teal-900/30">
+                    <svg class="w-6 h-6 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                </div>
+                <h1 class="text-2xl font-bold tracking-widest uppercase text-white shadow-sm">Enzyme reaction simulation</h1>
+            </div>
+            <button id="btn-reset" class="px-5 py-2 rounded bg-slate-800 hover:bg-slate-700 border border-slate-600 text-sm font-semibold transition-colors">
+                RESET VIAL
+            </button>
+        </header>
+
+        <!-- Left Panel: Concentration Stats -->
+        <aside id="left-panel" class="glass-panel">
+            <h2 class="text-xs font-bold text-slate-500 uppercase tracking-widest border-b border-slate-800 pb-2">Reaction Monitor</h2>
+            
+            <!-- Substrate -->
+            <div>
+                <div class="flex justify-between items-end">
+                    <span class="font-semibold text-green-400">Substrate (S)</span>
+                    <span id="stat-s-val" class="font-mono text-sm">0</span>
+                </div>
+                <div class="prog-bg"><div id="bar-s" class="prog-fill fill-s" style="width: 100%;"></div></div>
+            </div>
+
+            <!-- ES Complex -->
+            <div>
+                <div class="flex justify-between items-end">
+                    <span class="font-semibold text-purple-400">ES Complex</span>
+                    <span id="stat-es-val" class="font-mono text-sm">0</span>
+                </div>
+                <div class="prog-bg"><div id="bar-es" class="prog-fill fill-es" style="width: 0%;"></div></div>
+            </div>
+
+            <!-- Product -->
+            <div>
+                <div class="flex justify-between items-end">
+                    <span class="font-semibold text-yellow-400">Product (P)</span>
+                    <span id="stat-p-val" class="font-mono text-sm">0</span>
+                </div>
+                <div class="prog-bg"><div id="bar-p" class="prog-fill fill-p" style="width: 0%;"></div></div>
+            </div>
+
+            <div class="mt-auto bg-black/40 p-4 rounded border border-slate-800">
+                <div class="text-xs text-slate-400 uppercase tracking-wider mb-1">Theoretical Rate</div>
+                <div id="stat-rate" class="font-mono text-3xl font-bold text-cyan-400">100%</div>
+                <div id="denature-warning" class="text-red-500 text-xs font-bold mt-2 pulse-text hidden">ENZYMES DENATURED!</div>
+            </div>
+        </aside>
+
+        <!-- Center: Canvas -->
+        <main id="canvas-container">
+            <canvas id="sim-canvas"></canvas>
+            
+            <!-- Floating Legend -->
+            <div class="absolute top-4 right-4 bg-black/60 p-3 rounded-lg border border-white/10 text-xs text-slate-300 font-mono backdrop-blur-sm">
+                <div class="flex items-center gap-2 mb-1"><span class="w-3 h-3 rounded-full bg-[#00e5ff] shadow-[0_0_5px_#00e5ff]"></span> Enzyme (Free)</div>
+                <div class="flex items-center gap-2 mb-1"><span class="w-3 h-3 rounded-full bg-[#39ff14] shadow-[0_0_5px_#39ff14]"></span> Substrate</div>
+                <div class="flex items-center gap-2 mb-1"><span class="w-3 h-3 rounded-full bg-[#b026ff] shadow-[0_0_5px_#b026ff]"></span> ES Complex</div>
+                <div class="flex items-center gap-2 mb-1"><span class="w-3 h-3 rounded-full bg-[#ffea00] shadow-[0_0_5px_#ffea00]"></span> Product</div>
+                <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-md bg-[#ff3333]"></span> Denatured</div>
+            </div>
+        </main>
+
+        <!-- Right Panel: Enzyme Selection -->
+        <aside id="right-panel" class="glass-panel">
+            <h2 class="text-xs font-bold text-slate-500 uppercase tracking-widest border-b border-slate-800 pb-2">Enzyme Selector</h2>
+            
+            <button class="btn-select active" data-id="amylase">
+                <div class="font-bold text-white mb-1">Amylase</div>
+                <div class="text-xs text-slate-400">Breaks down Starch</div>
+                <div class="text-xs font-mono text-cyan-500 mt-2">Optimum: pH 7.0 | 37°C</div>
+            </button>
+            
+            <button class="btn-select" data-id="pepsin">
+                <div class="font-bold text-white mb-1">Pepsin</div>
+                <div class="text-xs text-slate-400">Breaks down Proteins</div>
+                <div class="text-xs font-mono text-cyan-500 mt-2">Optimum: pH 2.0 | 37°C</div>
+            </button>
+            
+            <button class="btn-select" data-id="lipase">
+                <div class="font-bold text-white mb-1">Lipase</div>
+                <div class="text-xs text-slate-400">Breaks down Lipids</div>
+                <div class="text-xs font-mono text-cyan-500 mt-2">Optimum: pH 8.0 | 37°C</div>
+            </button>
+        </aside>
+
+        <!-- Bottom Panel: Sliders -->
+        <footer id="bottom-panel" class="glass-panel">
+            
+            <!-- pH -->
+            <div class="flex-1 max-w-[250px]">
+                <div class="flex justify-between mb-2">
+                    <label class="text-sm font-semibold text-slate-300">pH Level</label>
+                    <span id="lbl-ph" class="font-mono text-cyan-400 font-bold">7.0</span>
+                </div>
+                <input type="range" id="sl-ph" class="slider-ph" min="0" max="14" step="0.5" value="7">
+            </div>
+
+            <!-- Temp -->
+            <div class="flex-1 max-w-[250px]">
+                <div class="flex justify-between mb-2">
+                    <label class="text-sm font-semibold text-slate-300">Temperature</label>
+                    <span id="lbl-temp" class="font-mono text-red-400 font-bold">37°C</span>
+                </div>
+                <input type="range" id="sl-temp" class="slider-temp" min="0" max="100" step="1" value="37">
+            </div>
+
+            <!-- Speed -->
+            <div class="flex-1 max-w-[250px]">
+                <div class="flex justify-between mb-2">
+                    <label class="text-sm font-semibold text-slate-300">Simulation Speed</label>
+                    <span id="lbl-speed" class="font-mono text-purple-400 font-bold">1.0x</span>
+                </div>
+                <input type="range" id="sl-speed" class="slider-speed" min="0.1" max="3" step="0.1" value="1.0">
+            </div>
+
+        </footer>
+    </div>
+
+    <script>
+        // Data & Config
+        const DB = {
+            amylase: { name: 'Amylase', optPh: 7.0, optTemp: 37 },
+            pepsin: { name: 'Pepsin', optPh: 2.0, optTemp: 37 },
+            lipase: { name: 'Lipase', optPh: 8.0, optTemp: 37 }
+        };
+
+        const CONSTANTS = {
+            numEnzymes: 15,
+            numSubstrates: 120,
+            baseBindingTime: 120, // Frames the ES complex stays bound at 100% efficiency
+            denatureTemp: 60      // Irreversible denaturing point
+        };
+
+        let state = {
+            enzymeData: DB.amylase,
+            ph: 7.0,
+            temp: 37,
+            speed: 1.0,
+            rate: 1.0,           // 0.0 to 1.0 representing enzyme efficiency
+            denatured: false
+        };
+
+        // DOM Elements
+        const canvas = document.getElementById('sim-canvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('canvas-container');
+
+        const UI = {
+            slPh: document.getElementById('sl-ph'),
+            lblPh: document.getElementById('lbl-ph'),
+            slTemp: document.getElementById('sl-temp'),
+            lblTemp: document.getElementById('lbl-temp'),
+            slSpeed: document.getElementById('sl-speed'),
+            lblSpeed: document.getElementById('lbl-speed'),
+            btns: document.querySelectorAll('.btn-select'),
+            btnReset: document.getElementById('btn-reset'),
+            statS: document.getElementById('stat-s-val'),
+            statES: document.getElementById('stat-es-val'),
+            statP: document.getElementById('stat-p-val'),
+            barS: document.getElementById('bar-s'),
+            barES: document.getElementById('bar-es'),
+            barP: document.getElementById('bar-p'),
+            statRate: document.getElementById('stat-rate'),
+            warnDenatured: document.getElementById('denature-warning')
+        };
+
+        // Entities arrays
+        let enzymes = [];
+        let substrates = [];
+        let products = [];
+        
+        let reqId;
+
+        function resize() {
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+        }
+        window.addEventListener('resize', resize);
+
+        function calculateEfficiency() {
+            if (state.denatured) {
+                state.rate = 0;
+                return;
+            }
+            if (state.temp > CONSTANTS.denatureTemp) {
+                state.denatured = true;
+                state.rate = 0;
+                
+                // Instantly break any active complexes and denature
+                enzymes.forEach(e => {
+                    if (e.state === 'ES') {
+                        // Release substrate untouched
+                        substrates.push(new Molecule(e.x, e.y, 'S'));
+                        e.state = 'denatured';
+                    } else {
+                        e.state = 'denatured';
+                    }
+                });
+                return;
+            }
+
+            // Temp curve (0 to denatureTemp)
+            let tempFactor = 0;
+            if (state.temp <= state.enzymeData.optTemp) {
+                // Bell curve leading up to optimal
+                tempFactor = Math.exp(-Math.pow(state.temp - state.enzymeData.optTemp, 2) / 400);
+            } else {
+                // Sharper drop off after optimal until denature point
+                tempFactor = Math.exp(-Math.pow(state.temp - state.enzymeData.optTemp, 2) / 150);
+            }
+
+            // pH curve (Narrow bell curve)
+            const phFactor = Math.exp(-Math.pow(state.ph - state.enzymeData.optPh, 2) / 2.5);
+
+            state.rate = Math.max(0, tempFactor * phFactor);
+            
+            // Minimum activity near zero temp
+            if (state.temp === 0) state.rate = 0.02;
+        }
+
+        class Molecule {
+            constructor(x, y, type) {
+                this.x = x;
+                this.y = y;
+                this.type = type; // 'S' or 'P'
+                this.radius = type === 'S' ? 5 : 4;
+                
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 1.5 + 0.5;
+                this.baseVx = Math.cos(angle) * speed;
+                this.baseVy = Math.sin(angle) * speed;
+            }
+
+            update() {
+                // Temperature affects kinetic speed slightly
+                const kineticMult = Math.max(0.2, state.temp / 25);
+                this.x += this.baseVx * state.speed * kineticMult;
+                this.y += this.baseVy * state.speed * kineticMult;
+
+                // Bounce
+                if (this.x < this.radius || this.x > canvas.width - this.radius) this.baseVx *= -1;
+                if (this.y < this.radius || this.y > canvas.height - this.radius) this.baseVy *= -1;
+            }
+
+            draw(ctx) {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                if (this.type === 'S') {
+                    ctx.fillStyle = '#39ff14';
+                    ctx.shadowColor = '#39ff14';
+                } else {
+                    ctx.fillStyle = '#ffea00';
+                    ctx.shadowColor = '#ffea00';
+                }
+                ctx.shadowBlur = 8;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        }
+
+        class Enzyme {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.radius = 12;
+                this.state = 'free'; // 'free', 'ES', 'denatured'
+                this.bindingTimer = 0;
+                this.maxTimer = 0;
+
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 1.2 + 0.3;
+                this.baseVx = Math.cos(angle) * speed;
+                this.baseVy = Math.sin(angle) * speed;
+            }
+
+            update() {
+                // Movement
+                const kineticMult = Math.max(0.2, state.temp / 25);
+                
+                // If forming a complex, move much slower due to mass
+                const massFactor = this.state === 'ES' ? 0.3 : 1.0;
+
+                // If denatured, drift slowly
+                if (this.state === 'denatured') {
+                    this.x += this.baseVx * 0.2;
+                    this.y += this.baseVy * 0.2;
+                } else {
+                    this.x += this.baseVx * state.speed * kineticMult * massFactor;
+                    this.y += this.baseVy * state.speed * kineticMult * massFactor;
+                }
+
+                // Bounds
+                if (this.x < this.radius || this.x > canvas.width - this.radius) this.baseVx *= -1;
+                if (this.y < this.radius || this.y > canvas.height - this.radius) this.baseVy *= -1;
+
+                // Process Binding Timer
+                if (this.state === 'ES') {
+                    // Decrease timer based on sim speed. 
+                    // Reaction completes FASTER if rate is HIGH. 
+                    // To prevent infinite binding at low rates, we ensure a minimum completion speed.
+                    const completionSpeed = Math.max(0.05, state.rate); 
+                    this.bindingTimer -= (state.speed * completionSpeed);
+
+                    if (this.bindingTimer <= 0) {
+                        // Reaction complete: Release Product
+                        this.state = 'free';
+                        products.push(new Molecule(this.x, this.y, 'P'));
+                    }
+                }
+            }
+
+            draw(ctx) {
+                ctx.beginPath();
+                
+                if (this.state === 'denatured') {
+                    // Draw deformed square-ish shape
+                    ctx.rect(this.x - this.radius, this.y - this.radius, this.radius*2, this.radius*2);
+                    ctx.fillStyle = '#ff3333';
+                    ctx.globalAlpha = 0.5;
+                } 
+                else if (this.state === 'ES') {
+                    // Pulsing complex
+                    const pulse = Math.abs(Math.sin(Date.now() / 200 * state.speed)) * 4;
+                    ctx.arc(this.x, this.y, this.radius + pulse, 0, Math.PI * 2);
+                    ctx.fillStyle = '#b026ff';
+                    ctx.shadowColor = '#b026ff';
+                    ctx.shadowBlur = 15;
+                    
+                    // Draw little internal substrate attached
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, 4, 0, Math.PI*2);
+                    ctx.fillStyle = '#39ff14';
+                }
+                else {
+                    // Free Enzyme
+                    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = '#00e5ff';
+                    ctx.shadowColor = '#00e5ff';
+                    ctx.shadowBlur = 10;
+                }
+                
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                ctx.globalAlpha = 1.0;
+            }
+        }
+
+        function checkCollisions() {
+            if (state.denatured) return;
+
+            // Iterate backwards to safely remove substrates
+            for (let i = substrates.length - 1; i >= 0; i--) {
+                const s = substrates[i];
+                let reacted = false;
+
+                for (let j = 0; j < enzymes.length; j++) {
+                    const e = enzymes[j];
+                    
+                    if (e.state === 'free') {
+                        const dx = s.x - e.x;
+                        const dy = s.y - e.y;
+                        const dist = Math.sqrt(dx*dx + dy*dy);
+                        
+                        // Collision occurs
+                        if (dist < s.radius + e.radius) {
+                            // Probability of binding relies heavily on efficiency rate
+                            const bindProb = state.rate * 0.8; // Max 80% chance on contact at perfect conditions
+                            
+                            if (Math.random() < bindProb) {
+                                // Bind!
+                                e.state = 'ES';
+                                e.bindingTimer = CONSTANTS.baseBindingTime;
+                                e.maxTimer = CONSTANTS.baseBindingTime;
+                                
+                                // Remove substrate from pool
+                                substrates.splice(i, 1);
+                                reacted = true;
+                                break; // Stop checking this substrate
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function updateUI() {
+            // Calculate totals
+            const numS = substrates.length;
+            const numP = products.length;
+            let numES = 0;
+            enzymes.forEach(e => { if(e.state === 'ES') numES++; });
+
+            // Update text
+            UI.statS.innerText = numS;
+            UI.statES.innerText = numES;
+            UI.statP.innerText = numP;
+
+            // Update bars (percentage of total starting substrates)
+            const totalStart = CONSTANTS.numSubstrates;
+            UI.barS.style.width = `${(numS / totalStart) * 100}%`;
+            UI.barES.style.width = `${(numES / CONSTANTS.numEnzymes) * 100}%`; // Relative to total enzymes
+            UI.barP.style.width = `${(numP / totalStart) * 100}%`;
+
+            // Rate text
+            UI.statRate.innerText = state.denatured ? '0%' : `${(state.rate * 100).toFixed(0)}%`;
+            UI.statRate.style.color = state.denatured ? '#ff3333' : '#00e5ff';
+            
+            if(state.denatured) {
+                UI.warnDenatured.classList.remove('hidden');
+            } else {
+                UI.warnDenatured.classList.add('hidden');
+            }
+        }
+
+        function loop() {
+            // Slight clear for motion blur trail
+            ctx.fillStyle = 'rgba(5, 5, 5, 0.4)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Global physics speed multiplier check is inside update() methods
+            
+            // Check collisions if sim is running
+            if (state.speed > 0) {
+                checkCollisions();
+            }
+
+            // Update and draw
+            enzymes.forEach(e => { e.update(); e.draw(ctx); });
+            substrates.forEach(s => { s.update(); s.draw(ctx); });
+            products.forEach(p => { p.update(); p.draw(ctx); });
+
+            updateUI();
+
+            reqId = requestAnimationFrame(loop);
+        }
+
+        function initSim() {
+            cancelAnimationFrame(reqId);
+            resize();
+            
+            state.denatured = false;
+            enzymes = [];
+            substrates = [];
+            products = [];
+
+            // Reset Sliders UI visually to match current state
+            UI.slPh.value = state.ph;
+            UI.lblPh.innerText = parseFloat(state.ph).toFixed(1);
+            UI.slTemp.value = state.temp;
+            UI.lblTemp.innerText = state.temp + '°C';
+            UI.slSpeed.value = state.speed;
+            UI.lblSpeed.innerText = state.speed.toFixed(1) + 'x';
+
+            calculateEfficiency();
+
+            for(let i=0; i<CONSTANTS.numEnzymes; i++) {
+                enzymes.push(new Enzyme(Math.random()*canvas.width, Math.random()*canvas.height));
+            }
+            for(let i=0; i<CONSTANTS.numSubstrates; i++) {
+                substrates.push(new Molecule(Math.random()*canvas.width, Math.random()*canvas.height, 'S'));
+            }
+
+            loop();
+        }
+
+        // Event Listeners for Controls
+        UI.slPh.addEventListener('input', (e) => {
+            state.ph = parseFloat(e.target.value);
+            UI.lblPh.innerText = state.ph.toFixed(1);
+            calculateEfficiency();
+        });
+
+        UI.slTemp.addEventListener('input', (e) => {
+            state.temp = parseFloat(e.target.value);
+            UI.lblTemp.innerText = state.temp + '°C';
+            calculateEfficiency();
+        });
+
+        UI.slSpeed.addEventListener('input', (e) => {
+            state.speed = parseFloat(e.target.value);
+            UI.lblSpeed.innerText = state.speed.toFixed(1) + 'x';
+        });
+
+        UI.btns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                UI.btns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                
+                const type = btn.getAttribute('data-id');
+                state.enzymeData = DB[type];
+                
+                // Inherit optimal values directly for user convenience, or leave sliders?
+                // Let's set sliders to the new enzyme's optimal to demonstrate it easily.
+                state.ph = state.enzymeData.optPh;
+                state.temp = state.enzymeData.optTemp;
+                
+                initSim();
+            });
+        });
+
+        UI.btnReset.addEventListener('click', initSim);
+
+        // Bootstrap
+        window.onload = initSim;
+
+    </script>
+</body>
+</html>
